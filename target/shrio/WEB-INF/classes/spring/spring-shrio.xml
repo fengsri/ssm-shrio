@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	   xmlns:context="http://www.springframework.org/schema/context"
+	   xmlns:aop="http://www.springframework.org/schema/aop"
+	   xsi:schemaLocation="http://www.springframework.org/schema/beans
+	http://www.springframework.org/schema/beans/spring-beans.xsd
+	http://www.springframework.org/schema/context
+	http://www.springframework.org/schema/context/spring-context.xsd http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd">
+
+
+    <!--================================================1、与web.xml对应的shiroFilter===================================-->
+	<!-- Shiro的Web过滤器 -->
+	<bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+		<!-- Shiro的安全管理器，所有关于安全的操作都会经过SecurityManager -->
+		<property name="securityManager" ref="securityManager"/>
+		<!-- 系统认证提交地址，如果用户退出即session丢失就会访问这个页面 -->
+		<property name="loginUrl" value="/user/toLogin"/>
+		<!-- 权限验证失败跳转的页面，需要配合Spring的ExceptionHandler异常处理机制使用 -->
+		<property name="unauthorizedUrl" value="/index/toUnauthorized"/>
+		<!--成功以后跳转到首页-->
+		<property name="successUrl" value="/index/toIndex"/>
+		<!-- 自定义的过滤器链，从上向下执行，一般将`/**`放到最下面 -->
+		<property name="filterChainDefinitions">
+			<value>
+				<!-- 静态资源不拦截 -->
+				/static/** = anon
+				/layui/** = anon
+				<!--验证码放行-->
+				/image/**=anon
+				<!--登陆方法放行-->
+				/user/login= anon
+				<!-- Shiro提供了退出登录的配置`logout`，会生成路径为`/logout`的请求地址，访问这个地址即会退出当前账户并清空缓存 -->
+				/logout = logout
+				<!-- `/**`表示所有请求，表示访问该地址的用户是身份验证通过认证-->
+				/** = authc
+			</value>
+		</property>
+	</bean>
+
+
+    <!--==============================================5、缓存管理器===================================================-->
+    <!-- 缓存管理器 -->
+    <bean id="cacheManager2" class="org.apache.shiro.cache.ehcache.EhCacheManager">
+        <property name="cacheManagerConfigFile" value="classpath:ehcache.xml"/>
+    </bean>
+
+
+    <!-- ==============================================2、安全管理器============================================== -->
+	<!-- 安全管理器 -->
+	<bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+		<property name="realm" ref="myRealm"/>
+        <!--缓存管理-->
+        <property name="sessionManager" ref="sessionManager" />
+        <property name="cacheManager" ref="cacheManager2"/>
+        <!-- 记住我 -->
+        <property name="rememberMeManager" ref="rememberMeManager"/>
+	</bean>
+
+
+    <!--==============================================3、realm===================================================-->
+	<!-- Realm实现 -->
+	<bean id="myRealm" class="com.feng.shrio.MyRealm">
+        <property name="cacheManager" ref="cacheManager2"/>
+		<property name="credentialsMatcher" ref="credentialsMatcher"/>
+	</bean>
+	<!--认证匹配器-->
+	<bean id="credentialsMatcher" class="org.apache.shiro.authc.credential.HashedCredentialsMatcher">
+		<property name="hashAlgorithmName" value="md5"/>
+		<property name="hashIterations" value="2"/>
+	</bean>
+
+
+    <!--==============================================4、会话管理器===================================================-->
+    <!-- 会话管理器 -->
+    <bean id="sessionManager" class="org.apache.shiro.web.session.mgt.DefaultWebSessionManager">
+        <!-- session的失效时长，单位毫秒 -->
+        <property name="globalSessionTimeout" value="600000"/>
+        <!-- 删除失效的session -->
+        <property name="deleteInvalidSessions" value="true"/>
+    </bean>
+
+
+
+    <!--==============================================8、rememberMeManager管理器========================================-->
+    <!-- rememberMeManager管理器 -->
+    <bean id="rememberMeManager" class="org.apache.shiro.web.mgt.CookieRememberMeManager">
+        <property name="cookie" ref="rememberMeCookie" />
+    </bean>
+    <!-- 记住我cookie -->
+    <bean id="rememberMeCookie" class="org.apache.shiro.web.servlet.SimpleCookie">
+        <constructor-arg value="rememberMe" />
+        <!-- 记住我cookie生效时间30天 -->
+        <property name="maxAge" value="2592000" />
+    </bean>
+
+
+    <!--============================================== 7、开启shiro的注解支持========================================-->
+    <!-- 开启shiro的注解支持 -->
+    <bean id="defaultAdvisorAutoProxyCreator" class="org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator">
+        <!-- 必须改为true，即使用cglib方式为Action创建代理对象。默认值为false，使用JDK创建代理对象，会造成问题 -->
+        <property name="proxyTargetClass" value="true"></property>
+    </bean>
+    <!-- 使用shiro框架提供的切面类，用于创建代理对象 -->
+    <bean class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor"></bean>
+
+</beans>
